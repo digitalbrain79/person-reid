@@ -6,7 +6,7 @@ tf.flags.DEFINE_integer('batch_size', '2', 'batch size for training')
 tf.flags.DEFINE_integer('max_steps', '100000', 'max steps for training')
 tf.flags.DEFINE_string('logs_dir', 'logs/', 'path to logs directory')
 tf.flags.DEFINE_string('data_dir', 'data/', 'path to dataset')
-tf.flags.DEFINE_float('learning_rate', '0.0001', 'Learning rate for Adam Optimizer')
+tf.flags.DEFINE_float('learning_rate', '0.01', 'Learning rate for Adam Optimizer')
 tf.flags.DEFINE_string('mode', 'train', 'Mode train/ val/ test')
 tf.flags.DEFINE_string('images_dir', '', 'path to test images')
 
@@ -14,9 +14,9 @@ IMAGE_WIDTH = 60
 IMAGE_HEIGHT = 160
 
 def preprocess(images, is_train):
-    split = tf.split(images, [1, 1])
-    shape = [1 for _ in xrange(split[0].get_shape()[1])]
     def train():
+        split = tf.split(images, [1, 1])
+        shape = [1 for _ in xrange(split[0].get_shape()[1])]
         for i in xrange(len(split)):
             split[i] = tf.reshape(split[i], [FLAGS.batch_size, IMAGE_HEIGHT, IMAGE_WIDTH, 3])
             split[i] = tf.image.resize_images(split[i], [IMAGE_HEIGHT + 8, IMAGE_WIDTH + 3])
@@ -33,6 +33,8 @@ def preprocess(images, is_train):
         return [tf.reshape(tf.concat(split[0], axis=0), [FLAGS.batch_size, IMAGE_HEIGHT, IMAGE_WIDTH, 3]),
             tf.reshape(tf.concat(split[1], axis=0), [FLAGS.batch_size, IMAGE_HEIGHT, IMAGE_WIDTH, 3])]
     def val():
+        split = tf.split(images, [1, 1])
+        shape = [1 for _ in xrange(split[0].get_shape()[1])]
         for i in xrange(len(split)):
             split[i] = tf.reshape(split[i], [FLAGS.batch_size, IMAGE_HEIGHT, IMAGE_WIDTH, 3])
             split[i] = tf.image.resize_images(split[i], [IMAGE_HEIGHT, IMAGE_WIDTH])
@@ -108,40 +110,31 @@ def main(argv=None):
     val_num_id = cuhk03_dataset.get_num_id(FLAGS.data_dir, 'val')
 
     images1, images2 = preprocess(images, is_train)
-    '''
     logits = network(images1, images2)
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=labels, logits=logits))
     inference = tf.nn.softmax(logits)
 
-    optimizer = tf.train.MomentumOptimizer(FLAGS.learning_rate, momentum=0.9)
+    optimizer = tf.train.MomentumOptimizer(learning_rate, momentum=0.9)
     train = optimizer.minimize(loss)
-    '''
+    lr = FLAGS.learning_rate
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
-        batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'val', val_num_id,
-            IMAGE_WIDTH, IMAGE_HEIGHT, FLAGS.batch_size)
-        feed_dict = {learning_rate: FLAGS.learning_rate, images: batch_images,
-                     labels: batch_labels, is_train: False}
-        rs = sess.run(images1, feed_dict=feed_dict)
-        print(rs)
-        exit()
-
         for i in xrange(FLAGS.max_steps):
             batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'train', tarin_num_id,
                 IMAGE_WIDTH, IMAGE_HEIGHT, FLAGS.batch_size)
-            feed_dict = {learning_rate: FLAGS.learning_rate, images: batch_images,
+            feed_dict = {learning_rate: lr, images: batch_images,
                 labels: batch_labels, is_train: True}
             sess.run(train, feed_dict=feed_dict)
             train_loss = sess.run(loss, feed_dict=feed_dict)
-            print('Step: %d, Train loss: %f' % (i, train_loss))
+            print('Step: %d, Learning rate: %f, Train loss: %f' % (i, lr, train_loss))
+            lr = FLAGS.learning_rate * ((0.0001 * i + 1) ** -0.75)
 
             if i % 500 == 0:
                 batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'val', val_num_id,
                     IMAGE_WIDTH, IMAGE_HEIGHT, FLAGS.batch_size)
-                feed_dict = {learning_rate: FLAGS.learning_rate, images: batch_images,
-                    labels: batch_labels, is_train: False}
+                feed_dict = {images: batch_images, labels: batch_labels, is_train: False}
                 val_loss = sess.run(loss, feed_dict=feed_dict)
                 print('Step: %d, Val loss: %f' % (i, val_loss))
 
