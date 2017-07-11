@@ -61,6 +61,7 @@ def get_num_id(path, set):
 
 def read_data(path, set, num_id, image_width, image_height, batch_size):
     batch_images = []
+    labels = []
     for i in xrange(batch_size // 2):
         pairs = [get_pair(path, set, num_id, True), get_pair(path, set, num_id, False)]
         for pair in pairs:
@@ -71,8 +72,9 @@ def read_data(path, set, num_id, image_width, image_height, batch_size):
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 images.append(image)
             batch_images.append(images)
+        labels.append([1., 0.])
+        labels.append([0., 1.])
 
-    labels = [[1., 0.] for i in xrange(batch_size)]
     '''
     for pair in batch_images:
         for p in pair:
@@ -81,7 +83,7 @@ def read_data(path, set, num_id, image_width, image_height, batch_size):
             if key == 1048603:
                 exit()
     '''
-    return np.transpose(batch_images, (1, 0, 2, 3, 4)), labels
+    return np.transpose(batch_images, (1, 0, 2, 3, 4)), np.array(labels)
 
-#num_id = get_num_id('/home/thomas/Downloads/dl/dataset/cuhk03', 'val')
-#read_data('/home/thomas/Downloads/dl/dataset/cuhk03', 'val', num_id, 60, 160, 32)
+#num_id = get_num_id('/home/thomas/Downloads/dl/dataset/cuhk03', 'train')
+#image, label = read_data('/home/thomas/Downloads/dl/dataset/cuhk03', 'train', num_id, 60, 160, 32)

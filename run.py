@@ -2,8 +2,9 @@ import tensorflow as tf
 import cuhk03_dataset
 
 FLAGS = tf.flags.FLAGS
+#tf.flags.DEFINE_integer('batch_size', '150', 'batch size for training')
 tf.flags.DEFINE_integer('batch_size', '2', 'batch size for training')
-tf.flags.DEFINE_integer('max_steps', '100000', 'max steps for training')
+tf.flags.DEFINE_integer('max_steps', '210000', 'max steps for training')
 tf.flags.DEFINE_string('logs_dir', 'logs/', 'path to logs directory')
 tf.flags.DEFINE_string('data_dir', 'data/', 'path to dataset')
 tf.flags.DEFINE_float('learning_rate', '0.01', 'Learning rate for Adam Optimizer')
@@ -46,16 +47,20 @@ def preprocess(images, is_train):
             tf.reshape(tf.concat(split[1], axis=0), [FLAGS.batch_size, IMAGE_HEIGHT, IMAGE_WIDTH, 3])]
     return tf.cond(is_train, train, val)
 
-def network(images1, images2):
+def network(images1, images2, weight_decay):
     with tf.variable_scope('network'):
         # Tied Convolution
-        conv1_1 = tf.layers.conv2d(images1, 20, [5, 5], activation=tf.nn.relu, name='conv1_1')
+        conv1_1 = tf.layers.conv2d(images1, 20, [5, 5], activation=tf.nn.relu,
+            kernel_regularizer=tf.contrib.layers.l2_regularizer(weight_decay), name='conv1_1')
         pool1_1 = tf.layers.max_pooling2d(conv1_1, [2, 2], [2, 2], name='pool1_1')
-        conv1_2 = tf.layers.conv2d(pool1_1, 25, [5, 5], activation=tf.nn.relu, name='conv1_2')
+        conv1_2 = tf.layers.conv2d(pool1_1, 25, [5, 5], activation=tf.nn.relu,
+            kernel_regularizer=tf.contrib.layers.l2_regularizer(weight_decay), name='conv1_2')
         pool1_2 = tf.layers.max_pooling2d(conv1_2, [2, 2], [2, 2], name='pool1_2')
-        conv2_1 = tf.layers.conv2d(images2, 20, [5, 5], activation=tf.nn.relu, name='conv2_1')
+        conv2_1 = tf.layers.conv2d(images2, 20, [5, 5], activation=tf.nn.relu,
+            kernel_regularizer=tf.contrib.layers.l2_regularizer(weight_decay), name='conv2_1')
         pool2_1 = tf.layers.max_pooling2d(conv2_1, [2, 2], [2, 2], name='pool2_1')
-        conv2_2 = tf.layers.conv2d(pool2_1, 25, [5, 5], activation=tf.nn.relu, name='conv2_2')
+        conv2_2 = tf.layers.conv2d(pool2_1, 25, [5, 5], activation=tf.nn.relu,
+            kernel_regularizer=tf.contrib.layers.l2_regularizer(weight_decay), name='conv2_2')
         pool2_2 = tf.layers.max_pooling2d(conv2_2, [2, 2], [2, 2], name='pool2_2')
 
         # Cross-Input Neighborhood Differences
@@ -84,13 +89,17 @@ def network(images1, images2):
         k2 = tf.nn.relu(tf.transpose(reshape2, [0, 2, 3, 1]), name='k2')
 
         # Patch Summary Features
-        l1 = tf.layers.conv2d(k1, 25, [5, 5], (5, 5), activation=tf.nn.relu, name='l1')
-        l2 = tf.layers.conv2d(k2, 25, [5, 5], (5, 5), activation=tf.nn.relu, name='l2')
+        l1 = tf.layers.conv2d(k1, 25, [5, 5], (5, 5), activation=tf.nn.relu,
+            kernel_regularizer=tf.contrib.layers.l2_regularizer(weight_decay), name='l1')
+        l2 = tf.layers.conv2d(k2, 25, [5, 5], (5, 5), activation=tf.nn.relu,
+            kernel_regularizer=tf.contrib.layers.l2_regularizer(weight_decay), name='l2')
 
         # Across-Patch Features
-        m1 = tf.layers.conv2d(l1, 25, [3, 3], activation=tf.nn.relu, name='m1')
+        m1 = tf.layers.conv2d(l1, 25, [3, 3], activation=tf.nn.relu,
+            kernel_regularizer=tf.contrib.layers.l2_regularizer(weight_decay), name='m1')
         pool_m1 = tf.layers.max_pooling2d(m1, [2, 2], [2, 2], padding='same', name='pool_m1')
-        m2 = tf.layers.conv2d(l2, 25, [3, 3], activation=tf.nn.relu, name='m2')
+        m2 = tf.layers.conv2d(l2, 25, [3, 3], activation=tf.nn.relu,
+            kernel_regularizer=tf.contrib.layers.l2_regularizer(weight_decay), name='m2')
         pool_m2 = tf.layers.max_pooling2d(m2, [2, 2], [2, 2], padding='same', name='pool_m2')
 
         # Higher-Order Relationships
@@ -106,22 +115,34 @@ def main(argv=None):
     images = tf.placeholder(tf.float32, [2, FLAGS.batch_size, IMAGE_HEIGHT, IMAGE_WIDTH, 3], name='images')
     labels = tf.placeholder(tf.float32, [FLAGS.batch_size, 2], name='labels')
     is_train = tf.placeholder(tf.bool, name='is_train')
+    global_step = tf.Variable(0, name='global_step', trainable=False)
     tarin_num_id = cuhk03_dataset.get_num_id(FLAGS.data_dir, 'train')
     val_num_id = cuhk03_dataset.get_num_id(FLAGS.data_dir, 'val')
+    weight_decay = 0.0005
 
+    print('Preprocess images')
     images1, images2 = preprocess(images, is_train)
-    logits = network(images1, images2)
+    print('Build network')
+    logits = network(images1, images2, weight_decay)
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=labels, logits=logits))
     inference = tf.nn.softmax(logits)
 
+    print('Create optimizer')
     optimizer = tf.train.MomentumOptimizer(learning_rate, momentum=0.9)
-    train = optimizer.minimize(loss)
+    train = optimizer.minimize(loss, global_step=global_step)
     lr = FLAGS.learning_rate
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
+        saver = tf.train.Saver()
+        step = sess.run(global_step)
 
-        for i in xrange(FLAGS.max_steps):
+        ckpt = tf.train.get_checkpoint_state(FLAGS.logs_dir)
+        if ckpt and ckpt.model_checkpoint_path:
+            print('Restore model')
+            saver.restore(sess, ckpt.model_checkpoint_path)
+
+        for i in xrange(step, FLAGS.max_steps):
             batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'train', tarin_num_id,
                 IMAGE_WIDTH, IMAGE_HEIGHT, FLAGS.batch_size)
             feed_dict = {learning_rate: lr, images: batch_images,
@@ -137,6 +158,7 @@ def main(argv=None):
                 feed_dict = {images: batch_images, labels: batch_labels, is_train: False}
                 val_loss = sess.run(loss, feed_dict=feed_dict)
                 print('Step: %d, Val loss: %f' % (i, val_loss))
+                saver.save(sess, FLAGS.logs_dir + 'model.ckpt', i)
 
 if __name__ == '__main__':
     tf.app.run()
