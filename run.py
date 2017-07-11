@@ -2,8 +2,7 @@ import tensorflow as tf
 import cuhk03_dataset
 
 FLAGS = tf.flags.FLAGS
-#tf.flags.DEFINE_integer('batch_size', '150', 'batch size for training')
-tf.flags.DEFINE_integer('batch_size', '2', 'batch size for training')
+tf.flags.DEFINE_integer('batch_size', '150', 'batch size for training')
 tf.flags.DEFINE_integer('max_steps', '210000', 'max steps for training')
 tf.flags.DEFINE_string('logs_dir', 'logs/', 'path to logs directory')
 tf.flags.DEFINE_string('data_dir', 'data/', 'path to dataset')
@@ -71,18 +70,16 @@ def network(images1, images2, weight_decay):
         f = tf.multiply(reshape, m1s)
 
         trans = tf.transpose(pool2_2, [0, 3, 1, 2])
-        shape = trans.get_shape().as_list()
+        reshape = tf.reshape(trans, [1, shape[0], shape[1], shape[2], shape[3]])
         g = []
-        for i in xrange(FLAGS.batch_size):
-            for j in xrange(25):
-                print(i, j)
-                pad = tf.pad(trans[i][j], [[2, 2], [2, 2]])
-                for y in xrange(shape[2]):
-                    for x in xrange(shape[3]):
-                        g.append(tf.slice(pad, [y, x], [5, 5]))
+        pad = tf.pad(reshape, [[0, 0], [0, 0], [0, 0], [2, 2], [2, 2]])
+        for i in xrange(shape[2]):
+            for j in xrange(shape[3]):
+                g.append(pad[:,:,:,i:i+5,j:j+5])
 
         concat = tf.concat(g, axis=0)
-        g = tf.reshape(concat, [shape[0], shape[1], shape[2], shape[3], 5, 5])
+        reshape = tf.reshape(concat, [shape[2], shape[3], shape[0], shape[1], 5, 5])
+        g = tf.transpose(reshape, [2, 3, 0, 1, 4, 5])
         reshape1 = tf.reshape(tf.subtract(f, g), [shape[0], shape[1], shape[2] * 5, shape[3] * 5])
         reshape2 = tf.reshape(tf.subtract(g, f), [shape[0], shape[1], shape[2] * 5, shape[3] * 5])
         k1 = tf.nn.relu(tf.transpose(reshape1, [0, 2, 3, 1]), name='k1')
@@ -122,12 +119,12 @@ def main(argv=None):
 
     print('Preprocess images')
     images1, images2 = preprocess(images, is_train)
+
     print('Build network')
     logits = network(images1, images2, weight_decay)
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=labels, logits=logits))
     inference = tf.nn.softmax(logits)
 
-    print('Create optimizer')
     optimizer = tf.train.MomentumOptimizer(learning_rate, momentum=0.9)
     train = optimizer.minimize(loss, global_step=global_step)
     lr = FLAGS.learning_rate
