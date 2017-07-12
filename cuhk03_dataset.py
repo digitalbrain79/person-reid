@@ -3,6 +3,7 @@ import h5py
 import os
 import cv2
 import random
+import sys
 
 def prepare_data(path):
     f = h5py.File('%s/cuhk-03.mat' % path)
@@ -33,7 +34,6 @@ def prepare_data(path):
                     with open(filepath, 'wb') as image_file:
                         image_file.write(image)
                 except Exception as e:
-                    print('invalid data: ', i, j, str(e))
                     continue
 
 def get_pair(path, set, num_id, positive):
@@ -88,3 +88,6 @@ def read_data(path, set, num_id, image_width, image_height, batch_size):
                 exit()
     '''
     return np.transpose(batch_images, (1, 0, 2, 3, 4)), np.array(labels)
+
+if __name__ == '__main__':
+    prepare_data(sys.argv[1])
