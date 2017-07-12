@@ -1,4 +1,6 @@
 import tensorflow as tf
+import numpy as np
+import cv2
 import cuhk03_dataset
 
 FLAGS = tf.flags.FLAGS
@@ -6,9 +8,8 @@ tf.flags.DEFINE_integer('batch_size', '150', 'batch size for training')
 tf.flags.DEFINE_integer('max_steps', '210000', 'max steps for training')
 tf.flags.DEFINE_string('logs_dir', 'logs/', 'path to logs directory')
 tf.flags.DEFINE_string('data_dir', 'data/', 'path to dataset')
-tf.flags.DEFINE_float('learning_rate', '0.01', 'Learning rate for Adam Optimizer')
-tf.flags.DEFINE_string('mode', 'train', 'Mode train/ val/ test')
-tf.flags.DEFINE_string('images_dir', '', 'path to test images')
+tf.flags.DEFINE_float('learning_rate', '0.01', '')
+tf.flags.DEFINE_string('mode', 'train', 'Mode train, val')
 
 IMAGE_WIDTH = 60
 IMAGE_HEIGHT = 160
@@ -117,7 +118,6 @@ def main(argv=None):
     val_num_id = cuhk03_dataset.get_num_id(FLAGS.data_dir, 'val')
     weight_decay = 0.0005
 
-    print('Preprocess images')
     images1, images2 = preprocess(images, is_train)
 
     print('Build network')
@@ -139,23 +139,44 @@ def main(argv=None):
             saver.restore(sess, ckpt.model_checkpoint_path)
         step = sess.run(global_step)
 
-        for i in xrange(step, FLAGS.max_steps):
-            batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'train', tarin_num_id,
-                IMAGE_WIDTH, IMAGE_HEIGHT, FLAGS.batch_size)
-            feed_dict = {learning_rate: lr, images: batch_images,
-                labels: batch_labels, is_train: True}
-            sess.run(train, feed_dict=feed_dict)
-            train_loss = sess.run(loss, feed_dict=feed_dict)
-            print('Step: %d, Learning rate: %f, Train loss: %f' % (i, lr, train_loss))
-            lr = FLAGS.learning_rate * ((0.0001 * i + 1) ** -0.75)
-
-            if i % 1000 == 0:
-                batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'val', val_num_id,
+        if FLAGS.mode == 'train':
+            for i in xrange(step, FLAGS.max_steps):
+                batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'train', tarin_num_id,
                     IMAGE_WIDTH, IMAGE_HEIGHT, FLAGS.batch_size)
-                feed_dict = {images: batch_images, labels: batch_labels, is_train: False}
-                val_loss = sess.run(loss, feed_dict=feed_dict)
-                print('Step: %d, Val loss: %f' % (i, val_loss))
-                saver.save(sess, FLAGS.logs_dir + 'model.ckpt', i)
+                feed_dict = {learning_rate: lr, images: batch_images,
+                    labels: batch_labels, is_train: True}
+                sess.run(train, feed_dict=feed_dict)
+                train_loss = sess.run(loss, feed_dict=feed_dict)
+                print('Step: %d, Learning rate: %f, Train loss: %f' % (i, lr, train_loss))
+
+                lr = FLAGS.learning_rate * ((0.0001 * i + 1) ** -0.75)
+                if i % 1000 == 0:
+                    saver.save(sess, FLAGS.logs_dir + 'model.ckpt', i)
+        elif FLAGS.mode == 'val':
+            batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'val', val_num_id,
+                IMAGE_WIDTH, IMAGE_HEIGHT, FLAGS.batch_size)
+            feed_dict = {images: batch_images, labels: batch_labels, is_train: False}
+            prediction = sess.run(inference, feed_dict=feed_dict)
+            prediction = np.argmax(prediction, axis=1)
+            labels = np.argmax(batch_labels, axis=1)
+
+            total = 0.
+            for i in xrange(len(prediction)):
+                if prediction[i] == labels[i]:
+                    total += 1
+            print('Accuracy: %f' % (total / len(prediction)))
+
+            '''
+            for i in xrange(len(prediction)):
+                print('Prediction: %s, Label: %s' % (prediction[i] == 0, labels[i] == 0))
+                image1 = cv2.cvtColor(batch_images[0][i], cv2.COLOR_RGB2BGR)
+                image2 = cv2.cvtColor(batch_images[1][i], cv2.COLOR_RGB2BGR)
+                image = np.concatenate((image1, image2), axis=1)
+                cv2.imshow('image', image)
+                key = cv2.waitKey(0)
+                if key == 1048603:  # ESC key
+                    break
+            '''
 
 if __name__ == '__main__':
     tf.app.run()
