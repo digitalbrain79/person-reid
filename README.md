@@ -10,12 +10,12 @@ python cuhk03_dataset.py your_dataset_path
 
 ## Train
 ```
-python run.py
+python run.py --data_dir=your_dataset_path
 ```
 
 ## Validation
 ```
-python run.py --mode=val
+python run.py --mode=val --data_dir=your_dataset_path
 ```
 
 ## Result
