@@ -39,15 +39,19 @@ def prepare_data(path):
 def get_pair(path, set, num_id, positive):
     pair = []
     if positive:
-        id = int(random.random() * num_id)
+        value = int(random.random() * num_id)
+        id = [value, value]
+    else:
+        while True:
+            id = [int(random.random() * num_id), int(random.random() * num_id)]
+            if id[0] != id[1]:
+                break
+
     for i in xrange(2):
         filepath = ''
-        if not positive:
-            id = int(random.random() * num_id)
-
         while True:
             index = int(random.random() * 10)
-            filepath = '%s/labeled/%s/%04d_%02d.jpg' % (path, set, id, index)
+            filepath = '%s/labeled/%s/%04d_%02d.jpg' % (path, set, id[i], index)
             if not os.path.exists(filepath):
                 continue
             break
@@ -84,6 +88,3 @@ def read_data(path, set, num_id, image_width, image_height, batch_size):
                 exit()
     '''
     return np.transpose(batch_images, (1, 0, 2, 3, 4)), np.array(labels)
-
-#num_id = get_num_id('/home/thomas/Downloads/dl/dataset/cuhk03', 'train')
-#image, label = read_data('/home/thomas/Downloads/dl/dataset/cuhk03', 'train', num_id, 60, 160, 32)

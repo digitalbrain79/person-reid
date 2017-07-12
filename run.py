@@ -132,12 +132,12 @@ def main(argv=None):
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         saver = tf.train.Saver()
-        step = sess.run(global_step)
 
         ckpt = tf.train.get_checkpoint_state(FLAGS.logs_dir)
         if ckpt and ckpt.model_checkpoint_path:
             print('Restore model')
             saver.restore(sess, ckpt.model_checkpoint_path)
+        step = sess.run(global_step)
 
         for i in xrange(step, FLAGS.max_steps):
             batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'train', tarin_num_id,
@@ -149,7 +149,7 @@ def main(argv=None):
             print('Step: %d, Learning rate: %f, Train loss: %f' % (i, lr, train_loss))
             lr = FLAGS.learning_rate * ((0.0001 * i + 1) ** -0.75)
 
-            if i % 500 == 0:
+            if i % 1000 == 0:
                 batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'val', val_num_id,
                     IMAGE_WIDTH, IMAGE_HEIGHT, FLAGS.batch_size)
                 feed_dict = {images: batch_images, labels: batch_labels, is_train: False}
