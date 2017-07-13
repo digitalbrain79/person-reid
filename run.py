@@ -140,7 +140,7 @@ def main(argv=None):
         step = sess.run(global_step)
 
         if FLAGS.mode == 'train':
-            for i in xrange(step, FLAGS.max_steps):
+            for i in xrange(step, FLAGS.max_steps + 1):
                 batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'train', tarin_num_id,
                     IMAGE_WIDTH, IMAGE_HEIGHT, FLAGS.batch_size)
                 feed_dict = {learning_rate: lr, images: batch_images,
@@ -153,18 +153,19 @@ def main(argv=None):
                 if i % 1000 == 0:
                     saver.save(sess, FLAGS.logs_dir + 'model.ckpt', i)
         elif FLAGS.mode == 'val':
-            batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'val', val_num_id,
-                IMAGE_WIDTH, IMAGE_HEIGHT, FLAGS.batch_size)
-            feed_dict = {images: batch_images, labels: batch_labels, is_train: False}
-            prediction = sess.run(inference, feed_dict=feed_dict)
-            prediction = np.argmax(prediction, axis=1)
-            labels = np.argmax(batch_labels, axis=1)
-
             total = 0.
-            for i in xrange(len(prediction)):
-                if prediction[i] == labels[i]:
-                    total += 1
-            print('Accuracy: %f' % (total / len(prediction)))
+            for _ in xrange(10):
+                batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'val', val_num_id,
+                    IMAGE_WIDTH, IMAGE_HEIGHT, FLAGS.batch_size)
+                feed_dict = {images: batch_images, labels: batch_labels, is_train: False}
+                prediction = sess.run(inference, feed_dict=feed_dict)
+                prediction = np.argmax(prediction, axis=1)
+                label = np.argmax(batch_labels, axis=1)
+
+                for i in xrange(len(prediction)):
+                    if prediction[i] == label[i]:
+                        total += 1
+            print('Accuracy: %f' % (total / (FLAGS.batch_size * 10)))
 
             '''
             for i in xrange(len(prediction)):
