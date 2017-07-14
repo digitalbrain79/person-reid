@@ -16,7 +16,7 @@ git clone https://github.com/thomaspark-pkj/person-reid.git
 ```
 
 ## Prepare dataset
-Download CUHK03 dataset from http://www.ee.cuhk.edu.hk/~xgwang/CUHK_identification.html then extract file.
+Download CUHK03 dataset from [CUHK Person Re-identification Datasets](http://www.ee.cuhk.edu.hk/~xgwang/CUHK_identification.html) then extract file.
 ```
 python cuhk03_dataset.py your_dataset_path
 ```
