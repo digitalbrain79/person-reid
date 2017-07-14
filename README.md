@@ -8,7 +8,7 @@
 * TensorFlow 1.2.1
 * CUDA 8.0
 * cudnn 5.1
-* NVIDIA GTX Titan X PASCAL
+* NVIDIA GTX Titan X (Pascal)
 
 ## Installation
 ```
