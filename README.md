@@ -35,3 +35,12 @@ Accuracy can be different slightly because image pair is generated randomly in v
 ```
 Accuracy: 0.846667
 ```
+
+## Test
+```
+python run.py --mode=test --image1=your_dataset_path/labeled/val/0000_00.jpg --image2=your_dataset_path/labeled/val/0000_05.jpg
+```
+##### Result
+```
+True
+```

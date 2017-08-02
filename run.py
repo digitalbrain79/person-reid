@@ -9,7 +9,9 @@ tf.flags.DEFINE_integer('max_steps', '210000', 'max steps for training')
 tf.flags.DEFINE_string('logs_dir', 'logs/', 'path to logs directory')
 tf.flags.DEFINE_string('data_dir', 'data/', 'path to dataset')
 tf.flags.DEFINE_float('learning_rate', '0.01', '')
-tf.flags.DEFINE_string('mode', 'train', 'Mode train, val')
+tf.flags.DEFINE_string('mode', 'train', 'Mode train, val, test')
+tf.flags.DEFINE_string('image1', '', 'First image path to compare')
+tf.flags.DEFINE_string('image2', '', 'Second image path to compare')
 
 IMAGE_WIDTH = 60
 IMAGE_HEIGHT = 160
@@ -109,15 +111,22 @@ def network(images1, images2, weight_decay):
         return fc2
 
 def main(argv=None):
+    if FLAGS.mode == 'test':
+        FLAGS.batch_size = 1
+
     learning_rate = tf.placeholder(tf.float32, name='learning_rate')
     images = tf.placeholder(tf.float32, [2, FLAGS.batch_size, IMAGE_HEIGHT, IMAGE_WIDTH, 3], name='images')
     labels = tf.placeholder(tf.float32, [FLAGS.batch_size, 2], name='labels')
     is_train = tf.placeholder(tf.bool, name='is_train')
     global_step = tf.Variable(0, name='global_step', trainable=False)
-    tarin_num_id = cuhk03_dataset.get_num_id(FLAGS.data_dir, 'train')
-    val_num_id = cuhk03_dataset.get_num_id(FLAGS.data_dir, 'val')
     weight_decay = 0.0005
+    tarin_num_id = 0
+    val_num_id = 0
 
+    if FLAGS.mode == 'train':
+        tarin_num_id = cuhk03_dataset.get_num_id(FLAGS.data_dir, 'train')
+    elif FLAGS.mode == 'val':
+        val_num_id = cuhk03_dataset.get_num_id(FLAGS.data_dir, 'val')
     images1, images2 = preprocess(images, is_train)
 
     print('Build network')
@@ -137,9 +146,9 @@ def main(argv=None):
         if ckpt and ckpt.model_checkpoint_path:
             print('Restore model')
             saver.restore(sess, ckpt.model_checkpoint_path)
-        step = sess.run(global_step)
 
         if FLAGS.mode == 'train':
+            step = sess.run(global_step)
             for i in xrange(step, FLAGS.max_steps + 1):
                 batch_images, batch_labels = cuhk03_dataset.read_data(FLAGS.data_dir, 'train', tarin_num_id,
                     IMAGE_WIDTH, IMAGE_HEIGHT, FLAGS.batch_size)
@@ -178,6 +187,20 @@ def main(argv=None):
                 if key == 1048603:  # ESC key
                     break
             '''
+        elif FLAGS.mode == 'test':
+            image1 = cv2.imread(FLAGS.image1)
+            image1 = cv2.resize(image1, (IMAGE_WIDTH, IMAGE_HEIGHT))
+            image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
+            image1 = np.reshape(image1, (1, IMAGE_HEIGHT, IMAGE_WIDTH, 3)).astype(float)
+            image2 = cv2.imread(FLAGS.image2)
+            image2 = cv2.resize(image2, (IMAGE_WIDTH, IMAGE_HEIGHT))
+            image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
+            image2 = np.reshape(image2, (1, IMAGE_HEIGHT, IMAGE_WIDTH, 3)).astype(float)
+            test_images = np.array([image1, image2])
+
+            feed_dict = {images: test_images, is_train: False}
+            prediction = sess.run(inference, feed_dict=feed_dict)
+            print(bool(not np.argmax(prediction[0])))
 
 if __name__ == '__main__':
     tf.app.run()
